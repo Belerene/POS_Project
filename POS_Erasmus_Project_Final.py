@@ -356,9 +356,7 @@ def test_spark_mlp():
     mlp.fit(xTrain,yTrain)
     print("...Testing...")
     predictions = mlp.predict(xTest)
-    #print(confusion_matrix(yTest,predictions))
     print(classification_report(yTest,predictions))
-    print(mlp.score(xTest,yTest))
 
     
 def test_spark_bayes():
