@@ -188,146 +188,11 @@ def getTagset():
               'Mlsndl','Mlsndi','Mlsnpn','Mlsnpg','Mlsnpd','Mlsnpa','Mlsnpl','Mlsnpi','Sn','Sg','Sd','Sa','Sl','Si','Cc',
               'Cs','Q','I','Y','X','Xf','Xt','Xp','Γ'] #1903
 
-class LogisticRegression(object):
-    def __init__(self, input, n_in, n_out):
-        self.W = theano.shared(
-            value=np.zeros(
-                (n_in, n_out),
-                dtype=np.dtype('float32')
-            ),
-            name='W',
-            borrow=True
-        )
-        self.b= theano.shared(
-            value=np.zeros(
-                (n_out,),
-                dtype=np.dtype('float32')
-            ),
-            name='b',
-            borrow=True
-        )
-        self.p_y_given_x = T.nnet.softmax(T.dot(input, self.W) + self.b)
 
-        self.y_pred = T.argmax(self.p_y_given_x, axis=1)
-
-        self.params = [self.W, self.b]
-        
-        self.input = input
-
-    def negative_log_likelihood(self, y):
-        return -T.mean(T.log(self.p_y_given_x)[T.arange(y.shape[0]), y])
-
-    def errors(self, y):
-        if y.ndim != self.y_pred.ndim:
-            print(str(y.ndim))
-            print(str(self.y_pred.ndim))
-            raise TypeError(
-                'y should have the same shape as self.y_pred',
-                ('y', y.type, 'y_pred', self.y_pred.type)
-            )
-        if y.dtype.startswith('int'):
-            return T.mean(T.neq(self.y_pred, y))
-        else:
-            raise NotImplementedError()
-        
-
-class HiddenLayer(object):
-    def __init__(self, rng, input, n_in, n_out, W=None, b=None, activation=T.tanh):
-        self.input = input
-        if W is None:
-            W_values = np.asarray(
-                rng.uniform(
-                    low = -np.sqrt(6. / (n_in + n_out)),
-                    high = np.sqrt(6. / (n_in + n_out)),
-                    size = (n_in, n_out)
-                ),
-                dtype=np.dtype('float32')
-            )
-            if activation == theano.tensor.nnet.sigmoid:
-                W_values *= 4 # Xavier10 suggest that sigmoid should have 4 times larger initial weights compared to tanh
-            W = theano.shared(value=W_values, name='W', borrow=True)
-        
-        if b is None:
-            #b_values = np.zeros_like((n_out,), dtype=theano.config.floatX)
-            b_values = np.zeros(n_out).astype('float32')
-            b = theano.shared(value=b_values, name='b', borrow= True)
-        self.W = W
-        self.b = b
-        lin_output = T.dot(input, self.W) + self.b
-        self.output = (
-            lin_output if activation is None
-            else activation(lin_output) # asi tu je chyba <------------
-        )
-        self.params = [self.W, self.b]
-
-class MLP(object):
-    def __init__(self, rng, input, n_in, n_hidden, n_out):
-        #input_set = theano.tensor._shared(input.astype(np.dtype(np.float64)),borrow=True)
-        self.hiddenLayer = HiddenLayer(
-            rng=rng,
-            #input=input_set,
-            input=input,
-            n_in=n_in,
-            n_out=n_hidden,
-            activation=T.tanh
-        )
-        self.logRegressionLayer = LogisticRegression(
-            input=self.hiddenLayer.output,
-            n_in=n_hidden,
-            n_out=n_out
-        )
-        self.L1 = (
-            abs(self.hiddenLayer.W).sum()
-            + abs(self.logRegressionLayer.W).sum()
-        )
-        self.L2_sqr = (
-            (self.hiddenLayer.W ** 2).sum()
-            + (self.logRegressionLayer.W ** 2).sum()
-        )
-        self.negative_log_likelihood = (
-            self.logRegressionLayer.negative_log_likelihood
-        )
-        self.errors = self.logRegressionLayer.errors
-
-        self.params = self.hiddenLayer.params + self.logRegressionLayer.params
-
-        self.input = input
-
-#class Bayes(object):
-#    def fit(self, X, y):
-#        self.gaussians = dict()
-#        labels = set(y)
-#        for c in labels:
-#            current_x = X[y[0] == c]
-#            self.gaussians[c] = {
-#                'mu': current_x.mean(),
-#                'sigma': np.cov(current_x.T),
-#            }
-#            # plt.imshow(self.gaussians[c]['sigma'])
-#            # plt.show()
-#
-#    def predict_one(self, x):
-#        lls = self.distributions(x)
-#        return np.argmax(lls)
-#
-#    def predict(self, X):
-#        yPred = X.apply(lambda x: self.predict_one(x), axis=1)
-#        return yPred
-#
-#    def distributions(self, x):
-#        lls = np.zeros(len(self.gaussians))
-#        for c,g in self.gaussians.iteritems():
-#            x_minus_mu = x - g['mu']
-#            k1 = np.log(2*np.pi)*x.shape + np.log(np.linalg.det(g['sigma']))
-#            k2 = np.dot( np.dot(x_minus_mu, np.linalg.inv(g['sigma'])), x_minus_mu)
-#            ll = -0.5*(k1 + k2)
-#            lls[c] = ll
-#        return lls
         
 
         
 def loadData(dataset, lenghtOfWorld, numberOfTags):
-    tagset = getTagset()
     rawMatrix = ''
     tree = ET.iterparse(dataset)
     sentenceTagFirst = True
@@ -373,35 +238,6 @@ def addEmptyTags(numberOfTags):
     return emptyTags
  
 def processTag(tag):
-#    num = 0
-#    f = tag[0]
-#    if f=='N':
-#        num = [1,0,0,0,0,0,0,0,0,0,0,0,0]
-#    elif f=='V':
-#        num = [0,1,0,0,0,0,0,0,0,0,0,0,0]
-#    elif f=='A':
-#        num = [0,0,1,0,0,0,0,0,0,0,0,0,0]
-#    elif f=='R':
-#        num = [0,0,0,1,0,0,0,0,0,0,0,0,0]
-#    elif f=='P':
-#        num = [0,0,0,0,1,0,0,0,0,0,0,0,0]
-#    elif f=='M':
-#        num = [0,0,0,0,0,1,0,0,0,0,0,0,0]
-#    elif f=='S':
-#        num = [0,0,0,0,0,0,1,0,0,0,0,0,0]
-#    elif f=='C':
-#        num = [0,0,0,0,0,0,0,1,0,0,0,0,0]
-#    elif f=='Q':
-#        num = [0,0,0,0,0,0,0,0,1,0,0,0,0]
-#    elif f=='I':
-#        num = [0,0,0,0,0,0,0,0,0,1,0,0,0]
-#    elif f=='Y':
-#        num = [0,0,0,0,0,0,0,0,0,0,1,0,0]
-#    elif f=='X':
-#        num = [0,0,0,0,0,0,0,0,0,0,0,1,0]
-#    elif f=='Γ':
-#        num = [0,0,0,0,0,0,0,0,0,0,0,0,1]
-#    return np.array(num)
 
     totalLen = 9 # Tag has maximum of 9 characters
     if len(tag)<totalLen:
@@ -426,14 +262,6 @@ def encodeWord(word, tag, lenghth):
     #return np.hstack((tag,wordConverted))
 
 def encodeChars(word):
-#    first = True
-#    for c in word:
-#        if first:
-#            code = np.array(int(str(ord(c)+1000)))
-#            first = False
-#        else:
-#            code = np.hstack((code,int(str(ord(c)+1000))))
-#    return code
     return oneHotEncode(np.array([list(char) for char in word]).T)
     
 def oneHotEncodeTag(tag):
@@ -497,62 +325,6 @@ def stdev(numbers):
 #        variance = sum([pow(x-avg,2) for x in numbers])/float(len(numbers)-1)
     return np.std(numbers)#math.sqrt(variance)
  
-def summarize(dataset):
-	summaries = [(mean(attribute), stdev(attribute)) for attribute in zip(*dataset)]
-	del summaries[-1]
-	return summaries
- 
-def summarizeByClass(dataset):
-	separated = separateByClass(dataset)
-	summaries = {}
-	for classValue, instances in separated.items():
-		summaries[classValue] = summarize(instances)
-	return summaries
- 
-def calculateProbability(x, mean, stdev):
-    
-    ###### GAUSSIAN DISTRIBUTION #########
-    if stdev == 0:
-        exponent = 1
-    else:
-        exponent = math.exp(-(math.pow(x-mean,2)/(2*math.pow(stdev,2))))
-    return (1 / (math.sqrt(2*math.pi) * stdev)) * exponent
-    ###### 
-def calculateClassProbabilities(summaries, inputVector):
-    probabilities = {}
-    for classValue, classSummaries in summaries.items():
-        probabilities[classValue] = 1
-        for i in range(len(classSummaries)):
-            mean, stdev = classSummaries[i]
-            x = inputVector[i]
-            #if stdev != 0:
-            probabilities[classValue] *= calculateProbability(x, mean, stdev)
-    return probabilities
-	#{ k:v for k, v in probabilities.items() if v }		
-def predict(summaries, inputVector):
-    probabilities = calculateClassProbabilities(summaries, inputVector)
-    #probabilities = { k:v for k, v in probabilities.items() if v }	
-    bestLabel, bestProb = None, -1
-    for classValue, probability in probabilities.items():
-        #if probability != 0:
-        if bestLabel is None or probability > bestProb:
-            bestProb = probability
-            bestLabel = classValue
-    return bestLabel
- 
-def getPredictions(summaries, testSet):
-	predictions = []
-	for i in range(len(testSet)):
-		result = predict(summaries, testSet[i])
-		predictions.append(result)
-	return predictions
- 
-def getAccuracy(testSet, predictions):
-	correct = 0
-	for i in range(len(testSet)):
-		if testSet[i][-1] == predictions[i]:
-			correct += 1
-	return (correct/float(len(testSet))) * 100.0
  
 
 def saveData(data):
@@ -578,12 +350,7 @@ def test_spark_mlp():
     yTrain = data[:trainIndex,:351]
     xTest = data[trainIndex:,351:]
     yTest = data[trainIndex:,:351]
-    training = np.hstack((xTrain,yTrain))
-    test = np.hstack((xTest,yTest))
-    xdata = data[:,:-351]
-    ydata = data[:,-351]
-    
-    layers = [1536,2000,351]
+  
     mlp = MLPClassifier(hidden_layer_sizes=(1536,2000,351))
     print("...Training...")
     mlp.fit(xTrain,yTrain)
@@ -591,6 +358,7 @@ def test_spark_mlp():
     predictions = mlp.predict(xTest)
     #print(confusion_matrix(yTest,predictions))
     print(classification_report(yTest,predictions))
+    print(mlp.score(xTest,yTest))
 
     
 def test_spark_bayes():
