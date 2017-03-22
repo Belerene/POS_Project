@@ -342,6 +342,9 @@ def loadDataFromFile():
 	
 
 def test_spark_mlp():
+    dataset='C:/Users/rlukas/Desktop/TrainingCorpus_ssj500kv1_4-EN/ssj500k-en.xml'
+    #data = loadData(dataset, 4, 4)
+    #saveData(data)
     data = loadDataFromFile()
     np.random.shuffle(data)
     numRows, numCols = data.shape
